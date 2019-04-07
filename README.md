@@ -21,6 +21,6 @@ python3 annotate_video.py --video /path/to/video.mp4
 
 A small demo picture. GUIs made with Tkinter have a professional look from the 90s.
 
-![demoimage](media/demopicture.png)
+![demoimage](media/demopicture.PNG)
 
 
