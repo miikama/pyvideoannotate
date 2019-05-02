@@ -25,22 +25,30 @@ class VideoAnnotations:
 
     _defaults = {
         'annotation_frame_rate': 5,
-        'output_file': 'annotations.txt'
+        'output_file': 'annotations.txt',
+        'annotation_classes': ["class 1", "class 2"]
     }
 
-    def __init__(self, annotation_vid, output_file):
+    def __init__(self, annotation_vid, output_file, annotation_class_file=None):
 
         # set up default values
         self.__dict__.update(self._defaults) 
 
         self.output_file = output_file if output_file is not None else self.output_file
-        
+
+        # load class names from file or use defaults if no file given
+        self.annotation_classes = self.load_class_names(self.annotation_classes, annotation_class_file)        
 
         self.cap = self.open_video(annotation_vid)
 
         # number of frames to skip in the next/previous frame call
         self._frame_skip_count = 0
 
+        # which annotation we are going at
+        self._active_annotation_index = 0
+
+
+    
 
     def open_video(self, video_file):
 
@@ -101,6 +109,25 @@ class VideoAnnotations:
             for annotation in self._sequences:
                 f.write("{},{}\n".format(annotation.start, annotation.end))
 
+    def load_class_names(self, default_values, annotation_class_file):
+        """ 
+            Load class names from file if given. Class names on separate lines
+        """
+        if annotation_class_file is None:
+            return default_values
+
+        classes = []
+        with open(annotation_class_file, 'r') as f:
+            lines = f.read().splitlines()
+            for line in lines:
+                classes.append(str(line))
+
+        if len(classes)  == 0:
+            return default_values
+        else:
+            print(f"Read {len(classes)} classes from class file {annotation_class_file}")
+            return classes
+
 
     @property
     def time_between_frames(self):
@@ -134,6 +161,21 @@ class VideoAnnotations:
     @frame_skip_count.setter
     def frame_skip_count(self, new_value):
         self._frame_skip_count = new_value
+
+    @property
+    def active_annotation(self):
+        if len(self.annotation_classes) == 0:
+            return ""
+        else:            
+            return self.annotation_classes[self._active_annotation_index]
+
+    @active_annotation.setter
+    def active_annotation(self, new_active):
+        try:
+            self._active_annotation_index = self.annotation_classes.index(new_active)
+        # no such class
+        except ValueError:
+            pass
     
     
     
@@ -171,18 +213,15 @@ class UpdateLabel(tkinter.Label):
         self.text = new_text
 
 
-
-
-
 class AnnotationWidget:
 
 
-    def __init__(self, annotation_vid, annotation_out=None):
+    def __init__(self, annotation_vid, annotation_out=None, class_file=None):
 
         # A root window for displaying objects
         root = tkinter.Tk()  
 
-        self.vann = VideoAnnotations(annotation_vid, annotation_out)
+        self.vann = VideoAnnotations(annotation_vid, annotation_out, class_file)
 
         
         # Video viewing frame
@@ -199,7 +238,10 @@ class AnnotationWidget:
                         tkinter.Button(self.button_parent, text="End sequence", command=self.stop_ann_seq),
                         tkinter.Button(self.button_parent, text="Increase skipped frames", command=self.increase_skip_frames),
                         tkinter.Button(self.button_parent, text="Decrease skipped frames", command=self.decrease_skip_frames),
+                        tkinter.Button(self.button_parent, text="Mark annotations", command=self.mark_annotation),
                         tkinter.Button(self.button_parent, text="Save annotations", command=self.save_annotations)]
+
+
 
         # order buttons 
         for ind, but in enumerate(self.buttons):
@@ -209,6 +251,12 @@ class AnnotationWidget:
         self.info_parent = tkinter.Label(root)
         self.info_parent.grid(row=0, column=1)
 
+        # add an active annotation class widget
+        self.disp_string = tkinter.StringVar()
+        self.disp_string.set(self.vann.active_annotation)
+        self.ann_select_widget = tkinter.OptionMenu(self.info_parent, self.disp_string, *self.vann.annotation_classes, command=self.ann_selection_callback)
+        self.ann_select_widget.grid(row=0,column=0)
+
       
         self.info_labels = [UpdateLabel(self.info_parent, 'Frame count', 'frame_count', self.vann),
                             UpdateLabel(self.info_parent, 'Current frame', 'current_frame', self.vann),
@@ -217,7 +265,7 @@ class AnnotationWidget:
                             UpdateLabel(self.info_parent, 'Time between frames', 'time_between_frames', self.vann)]
 
         for ind, label in enumerate(self.info_labels):
-            label.grid(row=ind, column=0)
+            label.grid(row=ind+1, column=0)
 
 
         frame = self.vann.get_next_frame()
@@ -233,9 +281,7 @@ class AnnotationWidget:
         imgtk = ImageTk.PhotoImage(image=image) 
 
         self.image_area.configure(image=imgtk)
-        self.image_area.image = imgtk
-
-        
+        self.image_area.image = imgtk        
 
     def update_labels(self):
 
@@ -258,8 +304,16 @@ class AnnotationWidget:
 
         def __call__(self, *args, **kwargs):      
             self._func(self.obj, *args, **kwargs)
-            self.obj.update_labels()            
+            self.obj.update_labels()         
 
+    @update_gui
+    def mark_annotation(self):
+        print("starting annotation marking")   
+
+    @update_gui
+    def ann_selection_callback(self, active_name):
+        """callback gets the new selected option as argument"""        
+        self.vann.active_annotation = active_name 
 
     @update_gui
     def next_frame(self):
@@ -314,8 +368,13 @@ if __name__ == "__main__":
         help='path to output annotations, default '
     )
 
+    parser.add_argument(
+        '--class_file', type=str,
+        help='path to annotation classes file, class names on separate rows'
+    )
+
     args = parser.parse_args()
 
 
-    AnnotationWidget(args.video, annotation_out=args.annotation_out)
+    AnnotationWidget(args.video, annotation_out=args.annotation_out, class_file=args.class_file)
 
