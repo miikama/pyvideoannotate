@@ -1,0 +1,26 @@
+{
+	"frame_count" : 1, 
+	"frames": [
+
+		{
+			"frame_index": 0,
+			"objects" : [
+				{
+					"class_name" : "class1",
+					"class_id" : 1,
+					"object_id" : 0,
+					"object_coords" : [
+						{
+							"x": 123,
+							"y": 123
+						},
+						{
+							"x": 250,
+							"y": 250
+						}
+					]
+				}
+			]
+		}
+	]
+}
