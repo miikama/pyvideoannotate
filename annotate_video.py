@@ -3,274 +3,15 @@
 import cv2
 import tkinter 
 import math
-import colorsys
 import time
+import logging
 
+from annotation_holder import VideoAnnotations
 from PIL import Image, ImageTk
-from annotation_loader import AnnotationLoader
 
-class VideoAnnotation:
 
-    def __init__(self, start_index):
-
-        self.start = start_index
-        self.end = -1
-
-
-
-class VideoAnnotations:
-
-    _frames = []
-
-    _cur_index = 0
-
-    # list of tuples (start_index, end_index) that mark the video sequence 
-    _sequences = []
-
-    _defaults = {
-        'annotation_frame_rate': 5,
-        'output_file': 'annotations.txt',
-        'annotation_classes': ["class1", "class2"]
-    }
-
-    def __init__(self, annotation_vid, output_file, annotation_class_file=None, annotation_file=None):
-
-        # set up default values
-        self.__dict__.update(self._defaults) 
-
-        self.output_file = output_file if output_file is not None else self.output_file
-
-        # load class names from file or use defaults if no file given
-        self.annotation_classes = self.load_class_names(self.annotation_classes, annotation_class_file)        
-
-        # dictionary of class name -> color
-        self.class_colors = self.get_class_colors()
-
-        # dictionary of class name -> class_id 
-        self.class_ids =  self.get_class_ids()
-
-        self.cap = self.open_video(annotation_vid)
-
-        # init an annotation loader 
-        self.annotation_loader = AnnotationLoader()
-
-        self.frame_annotations = self.load_saved_annotations(self.annotation_loader, annotation_file)
-
-        # number of frames to skip in the next/previous frame call
-        self._frame_skip_count = 0
-
-        # which annotation we are going at
-        self._active_annotation_index = 0
-
-
-
-
-    
-
-    def open_video(self, video_file):
-
-        cap = cv2.VideoCapture(video_file)
-
-        if not cap.isOpened():
-            raise IOError("Couldn't open webcam or video")
-
-        return cap
-
-    def get_next_frame(self):
-
-        self._cur_index = min(self._cur_index + 1 + self.frame_skip_count, self.frame_count-1)
-
-        return self.read_new_frame()
-
-
-    def read_new_frame(self):
-
-        self.cap.set(cv2.CAP_PROP_POS_FRAMES, self._cur_index)
-
-        retval, frame = self.cap.read()        
-
-        #Rearrange the color channel
-        frame = frame[:,:,::-1]
-        
-        return frame
-
-
-    def get_prev_frame(self):
-
-        self._cur_index = max(self._cur_index -1 - self.frame_skip_count, 0)
-
-        return self.read_new_frame()
-
-    def mark_sequence_start(self):
-        """
-            Starting new sequence stops the previous
-        """
-
-        self.mark_sequence_end()
-
-        self._sequences.append( VideoAnnotation(self._cur_index) )  
-
-    def mark_sequence_end(self):
-
-        if self._sequences:
-
-            self._sequences[-1].end = self._cur_index
-
-    def save_annotations(self, file_name=None):
-
-        out_file = file_name if file_name is not None else self.output_file
-
-        print("saving annotations to: ", out_file)        
-
-        with open(out_file, 'w') as f:
-            for annotation in self._sequences:
-                f.write("{},{}\n".format(annotation.start, annotation.end))
-
-    def load_class_names(self, default_values, annotation_class_file):
-        """ 
-            Load class names from file if given. Class names on separate lines
-        """
-        if annotation_class_file is None:
-            return default_values
-
-        classes = []
-        with open(annotation_class_file, 'r') as f:
-            lines = f.read().splitlines()
-            for line in lines:
-                classes.append(str(line))
-
-        if len(classes)  == 0:
-            return default_values
-        else:
-            print(f"Read {len(classes)} classes from class file {annotation_class_file}")
-            return classes
-
-    def load_saved_annotations(self, annotation_loader, annotation_file):
-
-        """
-            For easier customization and different annotation types, the annotation loader 
-            is given as an argument.
-
-            If the annotation_file is None, initialize annotations storage for each frame.
-
-            If annotation_file path is given load the detections and make sure the contents 
-            of the annotation file are valid for this video.
-        """
-
-        frame_annotations = []
-
-        if annotation_file is None:
-
-            for ind in range(self.frame_count):
-                # add an empty list of detections for each frame
-                frame_annotations.append([])
-
-        else:
-
-            frame_annotations = annotation_loader.load_annotation_file(annotation_file)
-
-            print(f"loaded annotations {frame_annotations}")
-
-        return frame_annotations
-
-
-
-
-
-
-    def get_class_color(self, class_name):
-        if class_name in self.class_colors:
-            return self.class_colors[class_name]
-        else:
-            return '#ffffff'
-
-    def get_class_colors(self):
-        """
-            create distinct colors in hsv space
-        """
-        colors = dict()
-
-        nclasses = len(self.annotation_classes)
-
-        for ind, class_name in enumerate(self.annotation_classes):
-            hsv_color = (1.0*ind / nclasses,  .5, .5 )
-            rgb_color = tuple([int(255*clr) for clr in colorsys.hsv_to_rgb(*hsv_color)])
-            colors[class_name] = '#%02x%02x%02x' % rgb_color
-
-        from pprint import pprint
-        print("class colors: ")
-        pprint(colors)
-
-        return colors
-
-    def get_class_id(self, class_name):
-        if class_name in self.class_ids:
-            return self.class_ids[class_name]
-        else:
-            return -1  
-
-    def get_class_ids(self):
-        class_ids = dict()
-        for ind, class_name in enumerate(self.annotation_classes):
-            class_ids[class_name] = ind 
-        return class_ids
-
-    def next_annotation_class(self):
-        self._active_annotation_index = (self._active_annotation_index + 1) % len(self.annotation_classes)
-        return self.active_annotation
-
-
-    @property
-    def time_between_frames(self):
-        if self.fps > 0:
-            return 1.0 / self.fps
-        else:
-            return 0.0
-
-    @property
-    def frame_count(self):
-        if self.cap is not None:
-            return int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
-        else:
-            return 0
-
-    @property
-    def current_frame(self):
-        return self._cur_index
-
-    @property
-    def fps(self):
-        if self.cap is not None:
-            return int(self.cap.get(cv2.CAP_PROP_FPS))
-        else:
-            return 0
-
-    @property
-    def frame_skip_count(self):
-        return self._frame_skip_count
-
-    @frame_skip_count.setter
-    def frame_skip_count(self, new_value):
-        self._frame_skip_count = new_value
-
-    @property
-    def active_annotation(self):
-        if len(self.annotation_classes) == 0:
-            return ""
-        else:            
-            return self.annotation_classes[self._active_annotation_index]
-
-    @active_annotation.setter
-    def active_annotation(self, new_active):
-        try:
-            self._active_annotation_index = self.annotation_classes.index(new_active)
-        # no such class
-        except ValueError:
-            pass
-    
-    
-    
-
+# load logger
+logger = logging.getLogger("AnnotationWidget")
 
 
 
@@ -296,7 +37,7 @@ class UpdateLabel(tkinter.Label):
     def get_updated_text(self):
         obj = getattr(self.vann.__class__, self.field_name)
         new_text = "{}".format(obj.__get__(self.vann, self.vann.__class__))
-        return "{}:\n {}".format(self.descript_text, new_text)
+        return "{}: {}".format(self.descript_text, new_text)
 
     def update_text(self):
         new_text = self.get_updated_text()
@@ -327,54 +68,70 @@ class AnnotationWidget(tkinter.Tk):
         self._video_playing = False
         self._last_frame_change = time.time()
 
+        ################################## header ##################################
 
-         # info labels
+         # Header info labels
         self.info_parent = tkinter.Label(self)
-        self.info_parent.grid(row=self.root_row_index, column=0)
+        self.info_parent.pack(fill=tkinter.X, pady=5, padx=20)
 
-        # add an active annotation class widget
-        self.disp_string = tkinter.StringVar()
-        self.disp_string.set(self.vann.active_annotation)
-        self.ann_select_widget = tkinter.OptionMenu(self.info_parent, self.disp_string, *self.vann.annotation_classes, command=self.ann_selection_callback)
-        self.ann_select_widget.grid(row=0,column=0)
-
-      
-        self.info_labels = [UpdateLabel(self.info_parent, 'Frame count', 'frame_count', self.vann),
+        
+        
+        
+        self.info_labels = [UpdateLabel(self.info_parent, 'Class: ', 'active_annotation_class', self.vann),
+                            UpdateLabel(self.info_parent, 'Object id: ', 'active_annotation_object_id', self.vann),
+                            UpdateLabel(self.info_parent, 'Frame count', 'frame_count', self.vann),
                             UpdateLabel(self.info_parent, 'Current frame', 'current_frame', self.vann),
                             UpdateLabel(self.info_parent, 'FPS', 'fps', self.vann),
                             UpdateLabel(self.info_parent, 'Frames to skip', 'frame_skip_count', self.vann),
                             UpdateLabel(self.info_parent, 'Time between frames', 'time_between_frames', self.vann)]
 
-        for ind, label in enumerate(self.info_labels):
-            label.grid(row=0, column=ind+1)
 
         
+        for ind, label in enumerate(self.info_labels):
+            label.pack(side=tkinter.LEFT, padx=5)
+
+        ################################## class and object optionmenus  ##################################
+
+        self.menu_parent = tkinter.Label(self)
+
+        # add an active annotation class widget
+        self.class_string = tkinter.StringVar()
+        self.class_string.set(self.vann.active_annotation_class)
+        self.ann_select_widget = tkinter.OptionMenu(self.menu_parent, self.class_string, *self.vann.annotation_classes, command=self.ann_class_selection_callback)
+        self.ann_select_widget.pack(side=tkinter.LEFT, padx=10)
+        self.ann_select_widget.config(width=40)
+
+        # add an active annotation object widget
+        self.obj_string = tkinter.IntVar()
+        self.obj_string.set(self.vann.active_annotation_object_id)
+        logger.debug(f"current_frame_objects: {self.vann.current_frame_object_ids}")        
+        self.ann_obj_select_widget = tkinter.OptionMenu(self.menu_parent, self.obj_string, *self.vann.current_frame_object_ids, command=self.ann_object_selection_callback)
+        self.ann_obj_select_widget.pack(side=tkinter.LEFT, padx=10)
+        self.ann_obj_select_widget.config(width=20)
+
+        self.menu_parent.pack(fill=tkinter.X)
+
+
+        ################################## image ##################################
+
         # Video viewing frame
         self.image_area = tkinter.Canvas(self)
-        self.image_area.grid(row=self.root_row_index,column=0)
+        self.image_area.pack(fill=tkinter.X)
 
-        # create hidden boxes for all the annotable classes
-        self._boxes = [ self.image_area.create_rectangle((0,0,100,100),
-                                                     tags='tag'+str(self.vann.get_class_id(class_name)),
-                                                     fill="",
-                                                     width=2,
-                                                     state=tkinter.HIDDEN,
 
-                                                     outline=self.vann.get_class_color(class_name))
-                                    for class_name in self.vann.annotation_classes]
 
+
+        ################################## footer ##################################
 
 
         # buttons
         self.button_parent = tkinter.Label(self)
-        self.button_parent.grid(row=self.root_row_index, column=0)
+        self.button_parent.pack(fill=tkinter.X, pady=5, padx=20)
 
         self.buttons = [tkinter.Button(self.button_parent, text="Play", command=self.play_video),
                         tkinter.Button(self.button_parent, text="Pause", command=self.pause_video),
                         tkinter.Button(self.button_parent, text="Next frame", command=self.next_frame),
-                        tkinter.Button(self.button_parent, text="Previous frame", command=self.prev_frame),
-                        tkinter.Button(self.button_parent, text="Start sequence", command=self.start_ann_seq),
-                        tkinter.Button(self.button_parent, text="End sequence", command=self.stop_ann_seq),
+                        tkinter.Button(self.button_parent, text="Previous frame", command=self.prev_frame),                        
                         tkinter.Button(self.button_parent, text="Increase skipped frames", command=self.increase_skip_frames),
                         tkinter.Button(self.button_parent, text="Decrease skipped frames", command=self.decrease_skip_frames),
                         tkinter.Button(self.button_parent, text="Mark annotations", command=self.mark_annotation),
@@ -384,9 +141,9 @@ class AnnotationWidget(tkinter.Tk):
 
         # order buttons 
         for ind, but in enumerate(self.buttons):
-            but.grid(row=0, column=ind)
+            but.pack(side=tkinter.LEFT, padx=5)
 
-        frame = self.vann.get_next_frame()
+        frame = self.vann.read_new_frame()
         self.update_frame(frame)
 
         # bind events 
@@ -398,70 +155,6 @@ class AnnotationWidget(tkinter.Tk):
         # Start the GUI
         self.mainloop() 
 
-    def bind_events(self):
-
-        # listen to mouse clicks on canvas
-        self.image_area.bind('<Button-1>', self.image_area_clicked)
-        self.image_area.bind('<B1-Motion>', self.image_area_dragged)
-        self.image_area.bind('<ButtonRelease-1>', self.image_area_released)
-
-        def delegate_key_presses(event):
-
-            # start annotation by m    
-            if event.char == 'm':
-                self.mark_annotation()
-            elif event.char == "c":
-                self.next_annotation()
-        
-        # tkinter only allows binding general key pressed, use an inner function to do the work
-        self.bind('<Key>', delegate_key_presses)                
-
-
-    def image_area_clicked(self, event):
-
-        self._original_click_pos = (event.x, event.y)
-
-    def image_area_dragged(self, event):
-        """
-            redraw the active bbox as dragging
-            bboxes are found through their tag (which is their class_name)
-        """
-
-        if self._drawing:            
-            class_name = self.vann.active_annotation
-            # if tag is just a number string, tkinter mixes it with id :/
-            tag = 'tag'+str(self.vann.get_class_id(class_name))
-            box_id = self.image_area.find_withtag(tag)
-            self.image_area.itemconfig(box_id, state=tkinter.NORMAL)
-            self.image_area.coords(box_id, *(*self._original_click_pos, event.x, event.y))
-
-            self.image_area.bbox(box_id,(*self._original_click_pos, event.x, event.y) )
-
-
-    def image_area_released(self, event):
-
-        if self._drawing:
-            self._drawing = False
-
-
-    def update_frame(self, new_frame):
-
-        # Convert the Image object into a TkPhoto object
-        image = Image.fromarray(new_frame)
-        self.curr_frame = ImageTk.PhotoImage(image=image) 
-       
-        image_ref = self.image_area.create_image((0,0,), anchor=tkinter.NW, image=self.curr_frame)
-        self.image_area.tag_lower(image_ref)
-
-        height, width, clrs = new_frame.shape
-        self.image_area.config(width=width, height=height)
-
-
-    def update_labels(self):
-        for label in self.info_labels:
-            label.update_text()
-
-        self.disp_string.set(self.vann.active_annotation)
 
     class update_gui:
         """ Creating a class for wrapping gui updates in a decorator """
@@ -479,7 +172,91 @@ class AnnotationWidget(tkinter.Tk):
 
         def __call__(self, *args, **kwargs):      
             self._func(self.obj, *args, **kwargs)
-            self.obj.update_labels()         
+            self.obj.on_gui_update()        
+
+    def bind_events(self):
+
+        # listen to mouse clicks on canvas
+        self.image_area.bind('<Button-1>', self.image_area_clicked)
+        self.image_area.bind('<B1-Motion>', self.image_area_dragged)
+        self.image_area.bind('<ButtonRelease-1>', self.image_area_released)
+
+        # play video
+        self.bind('<space>', self.toggle_play)
+
+        def delegate_key_presses(event):
+
+            # start annotation by m    
+            if event.char == 'm':
+                self.mark_annotation()
+            elif event.char == "c":
+                self.next_annotation()
+        
+        # tkinter only allows binding general key pressed, use an inner function to do the work
+        self.bind('<Key>', delegate_key_presses)                
+
+
+
+    def update_frame(self, new_frame):
+
+        # Convert the Image object into a TkPhoto object
+        image = Image.fromarray(new_frame)
+        self.curr_frame = ImageTk.PhotoImage(image=image) 
+       
+        image_ref = self.image_area.create_image((0,0,), anchor=tkinter.NW, image=self.curr_frame)
+        self.image_area.tag_lower(image_ref)
+
+        height, width, clrs = new_frame.shape
+        self.image_area.config(width=width, height=height)
+
+        # draw the detections 
+        self.draw_detections()
+
+
+    def on_gui_update(self):
+        """
+            update everything that needs updating
+        """
+        for label in self.info_labels:
+            label.update_text()
+
+        self.class_string.set(self.vann.active_annotation_class)
+        self.obj_string.set(self.vann.active_annotation_object_id)
+
+        # update the possible available frame objects
+        self.update_menu_options(self.ann_obj_select_widget,
+                                 self.vann.current_frame_object_ids,
+                                 self.ann_object_selection_callback)        
+
+        self.draw_detections()
+
+    def draw_detections(self):
+
+        # get the annotations for this frame
+        annotations = self.vann.get_frame_annotations()
+
+        for annotation in annotations:            
+            annotation.draw_annotation(self.image_area,
+                                       self.vann.get_class_color(annotation.class_name))
+
+    def update_menu_options(self, optionmenu, new_options, command):
+        """
+            Update the shown options for the argument optionmenu.
+            Also needs a reference to the function to be called 
+            when the new options are selected.
+        """
+        menu = optionmenu['menu']
+
+        # delete previous values
+        menu.delete(0, "end")
+
+        # add new options
+        for option in new_options:
+            menu.add_command(label=option, command=command)
+
+
+
+    
 
     def play_video_loop(self):
         if self._video_playing:
@@ -499,6 +276,8 @@ class AnnotationWidget(tkinter.Tk):
         # schedule fps based update in ms
         self.after(int(correction*self.vann.time_between_frames*1000), self.play_video_loop)
 
+    def toggle_play(self, event):
+        self._video_playing = not self._video_playing
 
     def play_video(self):
         self._video_playing = True
@@ -507,15 +286,54 @@ class AnnotationWidget(tkinter.Tk):
         self._video_playing = False
 
 
+    def image_area_clicked(self, event):
+
+        self._original_click_pos = (event.x, event.y)
+
+    @update_gui
+    def image_area_dragged(self, event):
+        """
+            redraw the active bbox as dragging
+            bboxes are found through their tag (which is their class_name)
+        """
+
+        if self._drawing:                        
+            # if tag is just a number string, tkinter mixes it with id :/
+            active_annotation_object = self.vann.active_annotation_object
+
+            logger.debug(f"active annotation {active_annotation_object}")
+            logger.debug(f"current frame objects {self.vann.current_frame_object_ids}")
+            
+            # add new annotation object
+            if active_annotation_object is None:
+
+                self.vann.add_annotation(self.image_area, (*self._original_click_pos, event.x, event.y))
+
+            else:
+                self.vann.update_annotation(self.image_area, points=(*self._original_click_pos, event.x, event.y))
+
+    @update_gui
+    def image_area_released(self, event):
+
+        if self._drawing:
+            self._drawing = False
+
+
     @update_gui
     def mark_annotation(self):
         self._drawing = True
-        print("starting annotation marking")   
+        logger.debug("starting annotation marking")   
 
     @update_gui
-    def ann_selection_callback(self, active_name):
-        """callback gets the new selected option as argument"""        
-        self.vann.active_annotation = active_name 
+    def ann_object_selection_callback(self, object_id):
+        """callback gets the new selected option as argument"""   
+        logger.debug(f"updating active_object with object_id: {object_id} and type {type(object_id)}")     
+        self.vann.active_annotation_object = object_id 
+
+    @update_gui
+    def ann_class_selection_callback(self, active_name):
+        """callback gets the new selected option as argument"""                
+        self.vann.active_annotation_class = active_name 
 
     @update_gui
     def next_annotation(self):
@@ -530,14 +348,6 @@ class AnnotationWidget(tkinter.Tk):
     def prev_frame(self):
         frame = self.vann.get_prev_frame()
         self.update_frame(frame)
-
-    @update_gui
-    def start_ann_seq(self):
-        self.vann.mark_sequence_start()
-
-    @update_gui
-    def stop_ann_seq(self):
-        self.vann.mark_sequence_end()
 
     @update_gui
     def save_annotations(self):
@@ -564,6 +374,8 @@ class AnnotationWidget(tkinter.Tk):
 
 
 if __name__ == "__main__":
+
+    logging.basicConfig(level=logging.INFO)
 
     import argparse
 
