@@ -1,4 +1,5 @@
 
+import os
 import colorsys
 import cv2
 import logging 
@@ -10,8 +11,7 @@ from annotation_object import BoxDetection
 logger = logging.getLogger("VideoAnnotations")
 
 
-
-class VideoAnnotations:
+class Annotation:
 
     _frames = []
 
@@ -20,13 +20,14 @@ class VideoAnnotations:
     # list of tuples (start_index, end_index) that mark the video sequence 
     _sequences = []
 
+
     _defaults = {
         'annotation_frame_rate': 5,
         'output_file': 'annotations.json',
         'annotation_classes': ["class1", "class2"]
     }
 
-    def __init__(self, annotation_vid, output_file, annotation_class_file=None, annotation_file=None):
+    def __init__(self, output_file, annotation_class_file=None, annotation_file=None):
 
         # set up default values
         self.__dict__.update(self._defaults) 
@@ -37,8 +38,6 @@ class VideoAnnotations:
         self.annotation_classes = self.load_class_names(self.annotation_classes, annotation_class_file)      
 
         self.annotation_object_ids = set()  
-
-        self.cap = self.open_video(annotation_vid)
 
         # init an annotation loader 
         self.annotation_loader = AnnotationLoader()
@@ -52,50 +51,40 @@ class VideoAnnotations:
         # dictionary of class name -> class_id 
         self.class_ids =  self.get_class_ids()
 
-        # number of frames to skip in the next/previous frame call
-        self._frame_skip_count = 0
-
         # which annotation we are going at
         self._active_annotation_index = 0
 
         # index of the object we are currently annotating
         self._active_annotation_object = -1
 
-    def open_video(self, video_file):
-
-        cap = cv2.VideoCapture(video_file)
-
-        if not cap.isOpened():
-            raise IOError("Couldn't open webcam or video")
-
-        return cap
-
     def get_next_frame(self):
 
-        self._cur_index = min(self._cur_index + 1 + self.frame_skip_count, self.frame_count-1)
+        self._cur_index = min(self._cur_index + 1, self.frame_count-1)
 
         return self.read_new_frame()
 
     def read_new_frame(self):
+        """
+            reads an image in at _cur_index 
 
-        self.cap.set(cv2.CAP_PROP_POS_FRAMES, self._cur_index)
-
-        retval, frame = self.cap.read()        
-
-        #Rearrange the color channel
-        frame = frame[:,:,::-1]
-
+            @return: rgb image as numpy array
+        """
+        raise NotImplementedError("One should implement this in the childred class") 
+        
+    def init_new_frame(self):
+        """
+            A method to be called after changing frames
+        """
         # update the annotation objects for this frame
         if len(self.frame_annotations[self._cur_index]) > 0:
             self._active_annotation_object = 0        
         else:
             self._active_annotation_object = -1
-        
-        return frame
+
 
     def get_prev_frame(self):
 
-        self._cur_index = max(self._cur_index -1 - self.frame_skip_count, 0)
+        self._cur_index = max(self._cur_index -1, 0)
 
         return self.read_new_frame()
 
@@ -144,7 +133,7 @@ class VideoAnnotations:
 
             for ind in range(self.frame_count):
                 # add an empty list of detections for each frame
-                frame_annotations.append([])
+                frame_annotations.append([])               
 
         else:
 
@@ -261,37 +250,12 @@ class VideoAnnotations:
             return self.frame_annotations[frame_ind] 
 
     @property
-    def time_between_frames(self):
-        if self.fps > 0:
-            return 1.0 / self.fps
-        else:
-            return 0.0
-
-    @property
     def frame_count(self):
-        if self.cap is not None:
-            return int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
-        else:
-            return 0
-
+        raise NotImplementedError("Implement this in child class")
+        
     @property
     def current_frame(self):
         return self._cur_index
-
-    @property
-    def fps(self):
-        if self.cap is not None:
-            return int(self.cap.get(cv2.CAP_PROP_FPS))
-        else:
-            return 0
-
-    @property
-    def frame_skip_count(self):
-        return self._frame_skip_count
-
-    @frame_skip_count.setter
-    def frame_skip_count(self, new_value):
-        self._frame_skip_count = new_value
 
     @property
     def active_annotation_class(self):
@@ -358,10 +322,147 @@ class VideoAnnotations:
         else:
             return [-1]
 
+class VideoAnnotations(Annotation):
     
- 
+
+    def __init__(self, annotation_vid, output_file, annotation_class_file=None, annotation_file=None):
+
+        # open video capture, the size of the video is used to deduce the frame count. This needs 
+        # to happen before initializing the parent class
+        self.cap = self.open_video(annotation_vid)
+
+        # call the parent constructor
+        super().__init__(output_file, annotation_class_file, annotation_file)
+
+
+        # number of frames to skip in the next/previous frame call
+        self._frame_skip_count = 0
+
+    def open_video(self, video_file):
+
+        cap = cv2.VideoCapture(video_file)
+
+        if not cap.isOpened():
+            raise IOError("Couldn't open webcam or video")
+
+        return cap
+
+    def get_next_frame(self):
+
+        self._cur_index = min(self._cur_index + 1 + self.frame_skip_count, self.frame_count-1)
+
+        return self.read_new_frame()
+
+    def read_new_frame(self):
+
+        self.cap.set(cv2.CAP_PROP_POS_FRAMES, self._cur_index)
+
+        _, frame = self.cap.read()        
+
+        #Rearrange the color channel
+        frame = frame[:,:,::-1]
+
+        self.init_new_frame()
+        
+        return frame
+
+    def get_prev_frame(self):
+
+        self._cur_index = max(self._cur_index -1 - self.frame_skip_count, 0)
+
+        return self.read_new_frame()    
+
+    @property
+    def time_between_frames(self):
+        if self.fps > 0:
+            return 1.0 / self.fps
+        else:
+            return 0.0
+
+    @property
+    def frame_count(self):
+        if self.cap is not None:
+            return int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        else:
+            return 0    
+
+    @property
+    def fps(self):
+        if self.cap is not None:
+            return int(self.cap.get(cv2.CAP_PROP_FPS))
+        else:
+            return 0
+
+    @property
+    def frame_skip_count(self):
+        return self._frame_skip_count
+
+    @frame_skip_count.setter
+    def frame_skip_count(self, new_value):
+        self._frame_skip_count = new_value
+
     
+
+
+class ImageAnnotations(Annotation):
+    """
+        Goes through an image folder 
+    """
+
+    # TODO: add more image types that are supported by opencv
+    supported_file_types = ('png', 'jpg', 'jpeg')
+
+    def __init__(self, input_directory, output_file, annotation_class_file=None, annotation_file=None):
+
+        # image files in folder
+        self._image_files = self.read_image_names(input_directory)
+
+        print(f"Found image files: {self._image_files}")
+
+        # call the parent constructor
+        super().__init__(output_file, annotation_class_file, annotation_file)
+
+    def read_image_names(self, folder):
+
+        print(f"looking at image in folder {folder}")
+
+        if not os.path.exists(folder):
+            return None
+
+        print(f"folder exists")
+
+        image_file_paths = []
+
+        for fname in os.listdir(folder):
+
+            file_name, file_ext = os.path.splitext(fname)
+
+            print(f"looking file {fname} which has extension {file_ext}")
+
+            # take extension without dot, .png -> png
+            if file_ext[1:] in ImageAnnotations.supported_file_types:
+                image_file_paths.append(os.path.join(folder, fname))
+
+        return image_file_paths
+
+
+    def read_new_frame(self):
+        
+        cur_image_path = self._image_files[self._cur_index]
+
+        if not os.path.exists(cur_image_path):
+            raise OSError(f"No image file found at path: {cur_image_path} for image index {self._cur_index}")
+
+        frame = cv2.cvtColor(cv2.imread(cur_image_path), cv2.COLOR_BGR2RGB)
+
+        self.init_new_frame()
+
+        return frame
     
+    @property
+    def frame_count(self):
+        return len(self._image_files)
+
  
     
 

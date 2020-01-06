@@ -1,10 +1,14 @@
 
+import cv2
 import tkinter
 import logging
 
 
 # load logger
 logger = logging.getLogger("AnnotationObject")
+
+def hex_to_rgb(hex_color):
+    return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
 
 class BoxDetection:
 
@@ -37,6 +41,14 @@ class BoxDetection:
             self.draw_annotation(canvas, color)
 
         logger.debug(f"creating annotation box with tag {self.tag}")
+
+    def draw_annotation_to_array(self, frame, color):
+        """
+            Given a numpy array representing an image draw this object.
+        """
+
+        cv2.rectangle(frame, (self.coords[0],self.coords[1]), (self.coords[2],self.coords[3]), hex_to_rgb(self.color[1:]), thickness=2)
+
 
     def draw_annotation(self, canvas,color):
         """
@@ -133,7 +145,7 @@ class BoxDetection:
         det_dict = {
                     'class_name' : self.class_name,
                     'class_id' : self.class_id,
-                    'object_id' : self.object_id,
+                    'object_id' : self.obj_id,
                     'object_coords' : [
                         {
                             'x' : self.coords[0],
@@ -168,3 +180,4 @@ class BoxDetection:
         return f"{self.__class__.__name__} of class {self.class_name} and object id {self.obj_id} at {self.coords}"
 
 		
+
