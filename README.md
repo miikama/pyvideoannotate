@@ -21,13 +21,17 @@ A simple video browser with Python and Tkinter. Go through video frames and mark
 
 The only dependency of PyViAnnotate is opencv. This is developed with opencv 4, but will probably work with opencv 2.4 and 3.* as well since only core features are used. Opencv python bindings are found on the PyPI on most platforms, no need to start installing it separately.
 
-Install
+### Installation
+
+The directory is installable as python package. On some platforms a separate installation ```sudo apt install python3-tk``` might be necessary.
 
 ```shell
-python3 -m pip install -r requirements.txt
+cd pyviannotate
+python setup.py install
 ```
 
-Use
+
+### Useage
 
 ```shell
 python3 annotate_video.py --video /path/to/video.mp4
@@ -70,3 +74,7 @@ Annotation files are stored as json. The objects are stored for each frame. The 
 	]
 }
 ```
+
+
+## Installation
+

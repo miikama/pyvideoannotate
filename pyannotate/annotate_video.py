@@ -6,7 +6,7 @@ import math
 import time
 import logging
 
-from annotation_holder import VideoAnnotations
+from pyannotate.annotation_holder import VideoAnnotations
 from PIL import Image, ImageTk
 
 

@@ -1,6 +1,14 @@
 
 
 __pycache__
+env
+
 
 # media files
 media/*
+
+*.vscode
+*.code-workspace
+
+# built python package
+*.egg-info
