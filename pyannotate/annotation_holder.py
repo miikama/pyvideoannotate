@@ -156,7 +156,10 @@ class Annotation:
         return frame_annotations
 
     def add_annotation(self, points=None):
-        """Add new annotation for current frame"""
+        """Add new annotation for current frame"""    
+
+        if len(self.active_annotation_class) == 0:
+            self.next_annotation_class()
 
         class_name = self.active_annotation_class
 
@@ -223,9 +226,9 @@ class Annotation:
             rgb_color = tuple([int(255*clr) for clr in colorsys.hsv_to_rgb(*hsv_color)])
             colors[class_name] = '#%02x%02x%02x' % rgb_color
 
-        from pprint import pprint
-        print("class colors: ")
-        pprint(colors)
+        #from pprint import pprint
+        #print("class colors: ")
+        #pprint(colors)
 
         return colors
 
@@ -249,7 +252,7 @@ class Annotation:
             
     def next_annotation_class(self):
         if len(self.annotation_classes) == 0:
-            return
+            return None
 
         # if the first to annotate, -1 becomes 0
         self._active_annotation_class_index = (self._active_annotation_class_index + 1) % len(self.annotation_classes)
@@ -260,11 +263,24 @@ class Annotation:
         current_frame_annotations = self.get_annotations_for_current_frame()        
 
         if not current_frame_annotations:
+            self._active_annotation_object_index = -1
             return None
 
         self._active_annotation_object_index = (self._active_annotation_object_index + 1) % len(current_frame_annotations)
+
+        self.active_annotation_class = self.active_annotation_object.class_name
         return self.active_annotation_object
 
+    def delete_active_annotation_object(self):
+        active_object = self.active_annotation_object
+        if active_object is None:
+            return
+
+        self.frame_annotations[self._cur_index].pop(self._active_annotation_object_index)
+
+        # after taking the active out of the list, the active annotation object index should be updated
+        self.next_annotation_object_in_current_frame()
+ 
 
     def get_frame_annotations(self, frame_ind=None):
         """Return the detection objects for current frame"""        
@@ -284,25 +300,31 @@ class Annotation:
 
     @property
     def active_annotation_class(self):
+        if self._active_annotation_class_index < 0:
+            return ""
+
         if len(self.annotation_classes) == 0:
             return ""
-        else:            
-            return self.annotation_classes[self._active_annotation_class_index]
+        
+        return self.annotation_classes[self._active_annotation_class_index]
 
     @active_annotation_class.setter
-    def active_annotation_class(self, new_active):
+    def active_annotation_class(self, new_active: str):
         """ 
             Changes the class of the active annotation object
         """
         try:
             # get the index of the class to annotation
-            logger.info(f"Changing active annotation class to {new_active}")
+            
             self._active_annotation_class_index = self.annotation_classes.index(new_active)
+
+            print(f"Changing active annotation class to {new_active} which has index {self._active_annotation_class_index}")
 
             # change the annotation class of the object
             active_object = self.active_annotation_object
             if active_object is not None:
                 active_object.update_annotation(class_name=self.active_annotation_class,
+                                                class_id=self._active_annotation_class_index,
                                                 color=self.class_colors[self.active_annotation_class])
 
         # no such class
@@ -319,7 +341,7 @@ class Annotation:
             return -1        
 
     @property
-    def active_annotation_object(self):        
+    def active_annotation_object(self):      
         if self._active_annotation_object_index >= 0:
             return self.frame_annotations[self._cur_index][self._active_annotation_object_index]
         else:
@@ -338,12 +360,8 @@ class Annotation:
                 found = True
         self._active_annotation_object_index = -1 if not found else self._active_annotation_object_index
 
-
-        # FIXME: slow 
-        try:
-            self._active_annotation_class_index = self.annotation_classes.index(self.active_annotation_object.class_id)
-        except: 
-            self._active_annotation_class_index = -1
+        self.active_annotation_class = self.active_annotation_object.class_name
+        
     
     @property
     def current_frame_object_ids(self):
@@ -461,15 +479,11 @@ class ImageAnnotations(Annotation):
         if not os.path.exists(folder):
             return None
 
-        print(f"folder exists")
-
         image_file_paths = []
 
         for fname in os.listdir(folder):
 
             file_name, file_ext = os.path.splitext(fname)
-
-            print(f"looking file {fname} which has extension {file_ext}")
 
             # take extension without dot, .png -> png
             if file_ext[1:] in ImageAnnotations.supported_file_types:

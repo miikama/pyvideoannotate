@@ -86,9 +86,9 @@ class AnnotationWidget(tkinter.Tk):
         # add an active annotation class widget
         self.class_string = tkinter.StringVar()
         self.class_string.set(self.annotator.active_annotation_class)
-        self.annotator_select_widget = tkinter.OptionMenu(self.menu_parent, self.class_string, *self.annotator.annotation_classes, command=self.annotator_class_selection_callback)
-        self.annotator_select_widget.pack(side=tkinter.LEFT, padx=10)
-        self.annotator_select_widget.config(width=40)
+        self.annotator_class_select_widget = tkinter.OptionMenu(self.menu_parent, self.class_string, *self.annotator.annotation_classes, command=self.annotator_class_selection_callback)
+        self.annotator_class_select_widget.pack(side=tkinter.LEFT, padx=10)
+        self.annotator_class_select_widget.config(width=40)
 
         # add an active annotation object widget
         self.obj_string = tkinter.IntVar()
@@ -173,6 +173,8 @@ class AnnotationWidget(tkinter.Tk):
                 self.next_annotation_class()
             elif event.char == "v":
                 self.next_annotation_object()
+            elif event.char == "x":
+                self.delete_active_object()
             elif event.char == "a":
                 self.prev_frame()
             elif event.char == "d":
@@ -234,9 +236,7 @@ class AnnotationWidget(tkinter.Tk):
 
         for annotation in annotations:    
             annotation.update_annotation(visible=True)        
-            active = annotation.obj_id == active_annotation.obj_id
-            print(f"annotation obj_id {annotation.obj_id}, active obj id: {active_annotation.obj_id}")
-            print(f"annotation {annotation} is active {active}")
+            active = annotation.obj_id == active_annotation.obj_id            
             annotation.draw_annotation_to_array(frame,
                                        self.annotator.get_class_color(annotation.class_name), active)
 
@@ -285,8 +285,7 @@ class AnnotationWidget(tkinter.Tk):
 
     @update_gui
     def annotator_object_selection_callback(self, object_id):
-        """callback gets the new selected option as argument"""   
-        print(f"updating active_object with object_id: {object_id} and type {type(object_id)}")     
+        """callback gets the new selected option as argument"""           
         self.annotator.active_annotation_object = object_id 
 
     @update_gui
@@ -301,6 +300,10 @@ class AnnotationWidget(tkinter.Tk):
     @update_gui
     def next_annotation_object(self):
         self.annotator.next_annotation_object_in_current_frame()
+
+    @update_gui
+    def delete_active_object(self):
+        self.annotator.delete_active_annotation_object()
 
     @update_gui
     def next_frame(self):        

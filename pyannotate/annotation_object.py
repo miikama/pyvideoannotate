@@ -104,7 +104,7 @@ class BoxDetection:
                 # move the recently created item to the top
                 canvas.tag_raise(self.draw_ref)
 
-    def update_annotation(self, coords=None, visible=True, color=None, class_name=None):
+    def update_annotation(self, coords=None, visible=True, color=None, class_name=None, class_id=None):
         """
             Update the visibility, position, and/or color of the drawn annotation
         """
@@ -118,6 +118,7 @@ class BoxDetection:
 
         # update the class
         self.class_name = self.class_name if class_name is None else class_name
+        self.class_id = self.class_id if class_id is None else class_id
 
         # update color 
         self.color = self.color if color is None else color 
