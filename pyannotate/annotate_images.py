@@ -152,8 +152,7 @@ class AnnotationWidget(tkinter.Tk):
             self.obj = instance
             return self.__call__
 
-        def __call__(self, *args, **kwargs):      
-            print(f"update gui called for func {self._func}: {self._func.__name__}")
+        def __call__(self, *args, **kwargs):                  
             self._func(self.obj, *args, **kwargs)
             self.obj.on_gui_update()        
             
@@ -171,7 +170,9 @@ class AnnotationWidget(tkinter.Tk):
             if event.char == 'm':
                 self.mark_annotation()
             elif event.char == "c":
-                self.next_annotation()
+                self.next_annotation_class()
+            elif event.char == "v":
+                self.next_annotation_object()
             elif event.char == "a":
                 self.prev_frame()
             elif event.char == "d":
@@ -223,21 +224,21 @@ class AnnotationWidget(tkinter.Tk):
                                  self.annotator.current_frame_object_ids,
                                  self.annotator_object_selection_callback)  
 
-        print(f"redrawing detections")
-
         self.update_frame()
 
     def draw_detections(self, frame):
 
         # get the annotations for this frame
         annotations = self.annotator.get_frame_annotations()
-
-        print(f"drawing detections for annotations {annotations}")
+        active_annotation = self.annotator.active_annotation_object
 
         for annotation in annotations:    
             annotation.update_annotation(visible=True)        
+            active = annotation.obj_id == active_annotation.obj_id
+            print(f"annotation obj_id {annotation.obj_id}, active obj id: {active_annotation.obj_id}")
+            print(f"annotation {annotation} is active {active}")
             annotation.draw_annotation_to_array(frame,
-                                       self.annotator.get_class_color(annotation.class_name))
+                                       self.annotator.get_class_color(annotation.class_name), active)
 
     def update_menu_options(self, optionmenu, new_options, command):
         """
@@ -256,6 +257,7 @@ class AnnotationWidget(tkinter.Tk):
 
     def image_area_clicked(self, event):
         self._original_click_pos = (event.x, event.y)
+        self._drawing = True
 
     @update_gui
     def image_area_dragged(self, event):
@@ -263,30 +265,21 @@ class AnnotationWidget(tkinter.Tk):
             redraw the active bbox as dragging
             bboxes are found through their tag (which is their class_name)
         """
+        # if tag is just a number string, tkinter mixes it with id :/
+        active_annotation_object = self.annotator.active_annotation_object
 
-        if self._drawing:                        
-            # if tag is just a number string, tkinter mixes it with id :/
-            active_annotation_object = self.annotator.active_annotation_object
-
-            logger.debug(f"active annotation {active_annotation_object}")
-            logger.debug(f"current frame objects {self.annotator.current_frame_object_ids}")
-            
-            # add new annotation object
-            if active_annotation_object is None:
-
-                self.annotator.add_annotation(self.image_area, (*self._original_click_pos, event.x, event.y))
-
-            else:
-                self.annotator.update_annotation(self.image_area, points=(*self._original_click_pos, event.x, event.y))
+        # update annotation
+        if active_annotation_object is not None:                            
+            self.annotator.update_annotation((*self._original_click_pos, event.x, event.y))
 
     @update_gui
     def image_area_released(self, event):
         if self._drawing:
             self._drawing = False
 
-
     @update_gui
     def mark_annotation(self):
+        self.annotator.add_annotation()        
         self._drawing = True
         print("starting annotation marking")   
 
@@ -302,8 +295,12 @@ class AnnotationWidget(tkinter.Tk):
         self.annotator.active_annotation_class = active_name 
 
     @update_gui
-    def next_annotation(self):
+    def next_annotation_class(self):
         self.annotator.next_annotation_class()
+
+    @update_gui
+    def next_annotation_object(self):
+        self.annotator.next_annotation_object_in_current_frame()
 
     @update_gui
     def next_frame(self):        

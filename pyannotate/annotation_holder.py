@@ -1,4 +1,4 @@
-
+from typing import List, Dict
 import os
 import colorsys
 import cv2
@@ -52,10 +52,10 @@ class Annotation:
         self.class_ids =  self.get_class_ids()
 
         # which annotation we are going at
-        self._active_annotation_index = 0
+        self._active_annotation_class_index = -1
 
         # index of the object we are currently annotating
-        self._active_annotation_object = -1
+        self._active_annotation_object_index = -1
 
     def get_next_frame(self):
 
@@ -77,9 +77,9 @@ class Annotation:
         """
         # update the annotation objects for this frame
         if len(self.frame_annotations[self._cur_index]) > 0:
-            self._active_annotation_object = 0        
+            self._active_annotation_object_index = 0        
         else:
-            self._active_annotation_object = -1
+            self._active_annotation_object_index = -1
 
 
     def get_prev_frame(self):
@@ -96,7 +96,7 @@ class Annotation:
 
         self.annotation_loader.save_annotation_file(out_file, self.frame_annotations)
 
-    def load_class_names(self, default_values, annotation_class_file):
+    def load_class_names(self, default_values, annotation_class_file: str) -> List[str]:
         """ 
             Load class names from file if given. Class names on separate lines
         """
@@ -155,7 +155,7 @@ class Annotation:
 
         return frame_annotations
 
-    def add_annotation(self, canvas, points):
+    def add_annotation(self, points=None):
         """Add new annotation for current frame"""
 
         class_name = self.active_annotation_class
@@ -163,20 +163,25 @@ class Annotation:
         # if the there is no current annotation object create new
         new_obj_id = self.create_annotation_object()
 
-        annotation = BoxDetection(points,
+        print(f"new obj_id is {new_obj_id}")
+
+        new_points = (0,0,0,0)
+        if points is not None:
+            new_points = points
+
+        annotation = BoxDetection(new_points,
                                   class_name,
                                   self.class_ids[class_name],
-                                  new_obj_id,
-                                  canvas=canvas,
+                                  new_obj_id,                                  
                                   color=self.class_colors[class_name])
 
-        self.frame_annotations[self._cur_index].append(annotation)   
+        self.frame_annotations[self._cur_index].append(annotation)  
 
         self.active_annotation_object = new_obj_id   
 
         print(f"added annotation with class {class_name}")
 
-    def update_annotation(self, canvas, points):
+    def update_annotation(self, points):
 
         if self.active_annotation_object:            
             # the detection object currently active            
@@ -188,12 +193,11 @@ class Annotation:
         """Adds a new object id """
         obj_ids = self.annotation_object_ids
 
-        largest_obj_id = 0
+        new_id = 0
         # handle empty object ids
         if len(obj_ids) > 0:
             largest_obj_id = max(obj_ids) 
-
-        new_id = largest_obj_id
+            new_id = largest_obj_id + 1
 
         self.annotation_object_ids.add(new_id)
 
@@ -237,9 +241,30 @@ class Annotation:
             class_ids[class_name] = ind 
         return class_ids
 
+    def get_annotations_for_current_frame(self):
+        if len(self.frame_annotations) == 0 or self._cur_index < 0:
+            return []
+
+        return self.frame_annotations[self._cur_index]        
+            
     def next_annotation_class(self):
-        self._active_annotation_index = (self._active_annotation_index + 1) % len(self.annotation_classes)
-        self.active_annotation_class = self.annotation_classes[self._active_annotation_index]
+        if len(self.annotation_classes) == 0:
+            return
+
+        # if the first to annotate, -1 becomes 0
+        self._active_annotation_class_index = (self._active_annotation_class_index + 1) % len(self.annotation_classes)
+        self.active_annotation_class = self.annotation_classes[self._active_annotation_class_index]
+        return self.active_annotation_class
+
+    def next_annotation_object_in_current_frame(self):
+        current_frame_annotations = self.get_annotations_for_current_frame()        
+
+        if not current_frame_annotations:
+            return None
+
+        self._active_annotation_object_index = (self._active_annotation_object_index + 1) % len(current_frame_annotations)
+        return self.active_annotation_object
+
 
     def get_frame_annotations(self, frame_ind=None):
         """Return the detection objects for current frame"""        
@@ -262,7 +287,7 @@ class Annotation:
         if len(self.annotation_classes) == 0:
             return ""
         else:            
-            return self.annotation_classes[self._active_annotation_index]
+            return self.annotation_classes[self._active_annotation_class_index]
 
     @active_annotation_class.setter
     def active_annotation_class(self, new_active):
@@ -272,7 +297,7 @@ class Annotation:
         try:
             # get the index of the class to annotation
             logger.info(f"Changing active annotation class to {new_active}")
-            self._active_annotation_index = self.annotation_classes.index(new_active)
+            self._active_annotation_class_index = self.annotation_classes.index(new_active)
 
             # change the annotation class of the object
             active_object = self.active_annotation_object
@@ -294,9 +319,9 @@ class Annotation:
             return -1        
 
     @property
-    def active_annotation_object(self):
-        if self._active_annotation_object >= 0:
-            return self.frame_annotations[self._cur_index][self._active_annotation_object]
+    def active_annotation_object(self):        
+        if self._active_annotation_object_index >= 0:
+            return self.frame_annotations[self._cur_index][self._active_annotation_object_index]
         else:
             return None
 
@@ -306,12 +331,19 @@ class Annotation:
             Find the index of the annotation with the object 
             id from the current frames annotations 
         """
-        found = False
+        found = False        
         for ind, annotation in enumerate(self.frame_annotations[self._cur_index]):
             if annotation.obj_id == object_id:
-                self._active_annotation_object = ind                
+                self._active_annotation_object_index = ind                
                 found = True
-        self._active_annotation_object = -1 if not found else self._active_annotation_object
+        self._active_annotation_object_index = -1 if not found else self._active_annotation_object_index
+
+
+        # FIXME: slow 
+        try:
+            self._active_annotation_class_index = self.annotation_classes.index(self.active_annotation_object.class_id)
+        except: 
+            self._active_annotation_class_index = -1
     
     @property
     def current_frame_object_ids(self):

@@ -12,7 +12,7 @@ def hex_to_rgb(hex_color):
 
 class BoxDetection:
 
-    def __init__(self, points, class_name, class_id, obj_id, canvas=None, color='#ffffff'):
+    def __init__(self, points, class_name, class_id, obj_id, color='#ffffff'):
         """
         point1 and point2 are the upper left and the lower right corner, respectively.
         tuples of (x,y)
@@ -31,23 +31,25 @@ class BoxDetection:
         self.tag = f"obj_{obj_id}_tag"
 
         # annotation color
-        self.color = "#ffffff"
+        self.color = color
 
         # is the annotation visible
         self.visible = True
 
-        # initial drawing of the annotation if a tkinter canvas is given
-        if canvas is not None:
-            self.draw_annotation(canvas, color)
-
         logger.debug(f"creating annotation box with tag {self.tag}")
 
-    def draw_annotation_to_array(self, frame, color):
+    def draw_annotation_to_array(self, frame, color, active=False):
         """
             Given a numpy array representing an image draw this object.
         """
 
+        
         cv2.rectangle(frame, (self.coords[0],self.coords[1]), (self.coords[2],self.coords[3]), hex_to_rgb(self.color[1:]), thickness=2)
+        
+        if active:
+            spacing = 4
+            cv2.rectangle(frame, (self.coords[0] + spacing,self.coords[1] + spacing), (self.coords[2] - spacing,self.coords[3] - spacing), hex_to_rgb(self.color[1:]), thickness=2)
+
 
 
     def draw_annotation(self, canvas,color):

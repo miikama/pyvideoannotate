@@ -307,14 +307,13 @@ class AnnotationWidget(tkinter.Tk):
             # add new annotation object
             if active_annotation_object is None:
 
-                self.vann.add_annotation(self.image_area, (*self._original_click_pos, event.x, event.y))
+                self.vann.add_annotation((*self._original_click_pos, event.x, event.y))
 
             else:
-                self.vann.update_annotation(self.image_area, points=(*self._original_click_pos, event.x, event.y))
+                self.vann.update_annotation(points=(*self._original_click_pos, event.x, event.y))
 
     @update_gui
     def image_area_released(self, event):
-
         if self._drawing:
             self._drawing = False
 
