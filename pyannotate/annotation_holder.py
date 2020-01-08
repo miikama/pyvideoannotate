@@ -11,7 +11,7 @@ from annotation_object import BoxAnnotation, TextBoxAnnotation
 logger = logging.getLogger("VideoAnnotations")
 
 
-class Annotation:
+class Annotations:
 
     _frames = []
 
@@ -379,7 +379,7 @@ class Annotation:
         else:
             return [-1]
 
-class VideoAnnotations(Annotation):
+class VideoAnnotations(Annotations):
     
 
     def __init__(self, annotation_vid, output_file, annotation_class_file=None, annotation_file=None):
@@ -461,7 +461,7 @@ class VideoAnnotations(Annotation):
     
 
 
-class ImageAnnotations(Annotation):
+class ImageAnnotations(Annotations):
     """
         Goes through an image folder 
     """

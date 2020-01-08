@@ -56,8 +56,7 @@ class TextEntryWidget(tkinter.Tk):
 
         self.callback = text_callback
 
-        def text_finished(event):            
-            print(f"got text {self.input_box.get()}")       
+        def text_finished(event):                        
             self.callback(self.input_box.get())
             self.destroy()     
 
@@ -141,10 +140,11 @@ class AnnotationWidget(tkinter.Tk):
         self.button_parent = tkinter.Label(self)
         self.button_parent.pack(fill=tkinter.X, pady=5, padx=20)
 
-        self.buttons = [tkinter.Button(self.button_parent, text="Next frame", command=self.next_frame),
-                        tkinter.Button(self.button_parent, text="Previous frame", command=self.prev_frame),                                                
-                        tkinter.Button(self.button_parent, text="Mark annotations", command=self.mark_annotation),
-                        tkinter.Button(self.button_parent, text="Save annotations", command=self.save_annotations)]
+        self.buttons = [tkinter.Button(self.button_parent, text="Next frame (a)", command=self.next_frame),
+                        tkinter.Button(self.button_parent, text="Previous frame (d)", command=self.prev_frame),                                                
+                        tkinter.Button(self.button_parent, text="Mark annotation (m)", command=self.mark_annotation),
+                        tkinter.Button(self.button_parent, text="Save annotations", command=self.save_annotations),
+                        tkinter.Button(self.button_parent, text="Add text (t)", command=self.request_active_object_text)]
 
 
 

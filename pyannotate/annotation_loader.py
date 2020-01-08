@@ -17,7 +17,7 @@ class AnnotationLoader:
 		self.annotation_class = annotation_class
 
 
-	def load_annotation_file(self, file_path, ):
+	def load_annotation_file(self, file_path):
 
 		json_data = None 
 
