@@ -45,6 +45,30 @@ class UpdateLabel(tkinter.Label):
         self.text = new_text
 
 
+class TextEntryWidget(tkinter.Tk):
+
+    def __init__(self, text_callback):
+
+        super().__init__()
+
+        self.input_box = tkinter.Entry(self)
+        self.input_box.pack()
+
+        self.callback = text_callback
+
+        def text_finished(event):            
+            print(f"got text {self.input_box.get()}")       
+            self.callback(self.input_box.get())
+            self.destroy()     
+
+        self.input_box.bind('<Return>', text_finished)
+        self.input_box.focus_set()
+
+        self.focus()
+        self.mainloop()
+
+
+
 class AnnotationWidget(tkinter.Tk):
 
 
@@ -175,6 +199,8 @@ class AnnotationWidget(tkinter.Tk):
                 self.next_annotation_object()
             elif event.char == "x":
                 self.delete_active_object()
+            elif event.char == "t":
+                self.request_active_object_text()
             elif event.char == "a":
                 self.prev_frame()
             elif event.char == "d":
@@ -282,6 +308,18 @@ class AnnotationWidget(tkinter.Tk):
         self.annotator.add_annotation()        
         self._drawing = True
         print("starting annotation marking")   
+
+    @update_gui
+    def request_active_object_text(self):
+
+        def callback_from_text_finished(text):
+            if text:                                
+                self.annotator.add_text_to_current_annotation_object(text)
+                self.focus_set()
+
+        TextEntryWidget(callback_from_text_finished)
+        
+        
 
     @update_gui
     def annotator_object_selection_callback(self, object_id):

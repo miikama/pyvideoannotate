@@ -5,7 +5,7 @@ import cv2
 import logging 
 
 from annotation_loader import AnnotationLoader
-from annotation_object import BoxDetection
+from annotation_object import BoxAnnotation, TextBoxAnnotation
 
 # load logger
 logger = logging.getLogger("VideoAnnotations")
@@ -27,7 +27,7 @@ class Annotation:
         'annotation_classes': ["class1", "class2"]
     }
 
-    def __init__(self, output_file, annotation_class_file=None, annotation_file=None):
+    def __init__(self, output_file, annotation_class_file=None, annotation_file=None, annotation_loader=None):
 
         # set up default values
         self.__dict__.update(self._defaults) 
@@ -40,7 +40,7 @@ class Annotation:
         self.annotation_object_ids = set()  
 
         # init an annotation loader 
-        self.annotation_loader = AnnotationLoader()
+        self.annotation_loader = AnnotationLoader() if annotation_loader is None else annotation_loader
 
         # add the annotation file class names to the pool of possible classes
         self.frame_annotations = self.load_saved_annotations(annotation_file)
@@ -172,11 +172,18 @@ class Annotation:
         if points is not None:
             new_points = points
 
-        annotation = BoxDetection(new_points,
-                                  class_name,
-                                  self.class_ids[class_name],
-                                  new_obj_id,                                  
-                                  color=self.class_colors[class_name])
+        """
+            The annotation class is either:
+                                            BoxAnnotation
+                                            TextBoxAnnotation
+        """
+        print(f"Adding annotation for annotation class {self.annotation_loader.annotation_class}")
+
+        annotation = self.annotation_loader.annotation_class(new_points,
+                                                            class_name,
+                                                            self.class_ids[class_name],
+                                                            new_obj_id,                                  
+                                                            color=self.class_colors[class_name])
 
         self.frame_annotations[self._cur_index].append(annotation)  
 
@@ -470,7 +477,19 @@ class ImageAnnotations(Annotation):
         print(f"Found image files: {self._image_files}")
 
         # call the parent constructor
-        super().__init__(output_file, annotation_class_file, annotation_file)
+        super().__init__(output_file,
+                         annotation_class_file,
+                         annotation_file,
+                         annotation_loader=AnnotationLoader(TextBoxAnnotation))
+
+    def add_text_to_current_annotation_object(self, text):
+
+        if self.active_annotation_object is None:
+            return
+
+        print(f"Got an active annotation object: {self.active_annotation_object}")
+
+        self.active_annotation_object.update_annotation(text=text)
 
     def read_image_names(self, folder):
 

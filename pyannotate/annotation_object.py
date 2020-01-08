@@ -10,7 +10,7 @@ logger = logging.getLogger("AnnotationObject")
 def hex_to_rgb(hex_color):
     return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
 
-class BoxDetection:
+class BoxAnnotation:
 
     def __init__(self, points, class_name, class_id, obj_id, color='#ffffff'):
         """
@@ -183,4 +183,55 @@ class BoxDetection:
         return f"{self.__class__.__name__} of class {self.class_name} and object id {self.obj_id} at {self.coords}"
 
 		
+
+
+class TextBoxAnnotation(BoxAnnotation):
+
+    def __init__(self, *args, **kwargs):
+
+        super().__init__(*args, **kwargs)
+
+        self.text = ""
+
+    def update_annotation(self, text=None, **kwargs):
+
+        super().update_annotation(**kwargs)
+
+        self.text = self.text if text is None else text
+
+    @classmethod
+    def from_detection_json(cls, detection_json):
+        """
+            Do the same as parent class but just add the extra text
+        """
+        
+        # this calls the parent method but returns TextBoxAnnotation :)
+        basic_annotation = super(TextBoxAnnotation, cls).from_detection_json(detection_json)
+
+        if 'text' not in detection_json:
+            print(f"No text found for anntoation {basic_annotation}, cannot add it")
+            return basic_annotation
+
+        basic_annotation.update_annotation(text=detection_json['text'])
+
+        print(f"Loaded annotation {basic_annotation}")
+
+        return basic_annotation
+
+    def detection_to_json(self):
+        """
+            The same as parent but with added text
+        """
+        parent_json = super().detection_to_json()
+
+        parent_json['text'] = self.text
+
+        return parent_json
+
+    def __repr__(self):
+        return f"{self.__class__.__name__} of class {self.class_name} and object id {self.obj_id} at {self.coords} with text {self.text}"
+
+
+
+
 

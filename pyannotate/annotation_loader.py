@@ -2,7 +2,7 @@
 import json
 import logging
 
-from annotation_object import BoxDetection
+from annotation_object import BoxAnnotation
 
 # load logger
 logger = logging.getLogger("AnnotationLoader")
@@ -12,8 +12,12 @@ class AnnotationLoader:
 		Basically a BoxAnnotationLoader, since load detected boxes by default
 	"""
 
+	def __init__(self, annotation_class=BoxAnnotation):
 
-	def load_annotation_file(self, file_path):
+		self.annotation_class = annotation_class
+
+
+	def load_annotation_file(self, file_path, ):
 
 		json_data = None 
 
@@ -50,12 +54,14 @@ class AnnotationLoader:
 
 		"""
 			format the incoming detected json to whatever format wanted
-			The default class create is a BoxDetection.
+			The default class create is a BoxAnnotation.
 
 			To use different detection formats, override this method
 		"""
 
-		return BoxDetection.from_detection_json(detection_json)
+		print(f"Creating detection object with annotation class {self.annotation_class}")
+
+		return self.annotation_class.from_detection_json(detection_json)
 
 
 	def save_annotation_file(self, file_path, annotations):
