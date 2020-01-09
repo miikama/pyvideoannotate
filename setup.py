@@ -22,5 +22,11 @@ setuptools.setup(
         'opencv-contrib-python',
         'pillow'
     ],
+    entry_points={
+        'console_scripts': [
+            'ann_images = pyannotate.annotate_images:main',
+            'ann_video = pyannotate.annotate_video:main',
+        ],
+    },
     python_requires='>=3.6',        
 )

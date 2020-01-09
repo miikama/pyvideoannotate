@@ -4,8 +4,8 @@ import colorsys
 import cv2
 import logging 
 
-from annotation_loader import AnnotationLoader
-from annotation_object import BoxAnnotation, TextBoxAnnotation
+from pyannotate.annotation_loader import AnnotationLoader
+from pyannotate.annotation_object import BoxAnnotation, TextBoxAnnotation
 
 # load logger
 logger = logging.getLogger("VideoAnnotations")

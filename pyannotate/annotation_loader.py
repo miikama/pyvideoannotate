@@ -2,7 +2,7 @@
 import json
 import logging
 
-from annotation_object import BoxAnnotation
+from pyannotate.annotation_object import BoxAnnotation
 
 # load logger
 logger = logging.getLogger("AnnotationLoader")
