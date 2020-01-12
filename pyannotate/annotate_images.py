@@ -102,6 +102,11 @@ class AnnotationWidget(tkinter.Tk):
         for ind, label in enumerate(self.info_labels):
             label.pack(side=tkinter.LEFT, padx=5)
 
+        self.current_object_text_var = tkinter.StringVar()
+        self.current_object_text_var.set('Text: ')
+        self.current_object_text_label = tkinter.Label(self.info_parent, textvariable=self.current_object_text_var)
+        self.current_object_text_label.pack(side=tkinter.LEFT, padx=5)
+
         ################################## class and object optionmenus  ##################################
 
         self.menu_parent = tkinter.Label(self)
@@ -244,6 +249,10 @@ class AnnotationWidget(tkinter.Tk):
         for label in self.info_labels:
             label.update_text()
 
+        if self.annotator.active_annotation_object:
+            self.current_object_text_var.set("Text: {}".format(self.annotator.active_annotation_object.text))
+        
+
         self.class_string.set(self.annotator.active_annotation_class)
         self.obj_string.set(self.annotator.active_annotation_object_id)
 
@@ -316,15 +325,14 @@ class AnnotationWidget(tkinter.Tk):
             if text:                                
                 self.annotator.add_text_to_current_annotation_object(text)
                 self.focus_set()
+                self.on_gui_update()
 
         TextEntryWidget(callback_from_text_finished)
-        
-        
 
     @update_gui
-    def annotator_object_selection_callback(self, object_id):
+    def annotator_object_selection_callback(self):
         """callback gets the new selected option as argument"""           
-        self.annotator.active_annotation_object = object_id 
+        self.annotator.active_annotation_object = self.obj_string.get() 
 
     @update_gui
     def annotator_class_selection_callback(self, active_name):
