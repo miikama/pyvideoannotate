@@ -369,10 +369,7 @@ class AnnotationWidget(tkinter.Tk):
 
 
 
-
-
-
-if __name__ == "__main__":
+def main():
 
     logging.basicConfig(level=logging.INFO)
 
@@ -407,3 +404,7 @@ if __name__ == "__main__":
 
     AnnotationWidget(vann)
 
+
+
+if __name__ == "__main__":
+    main()
